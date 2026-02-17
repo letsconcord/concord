@@ -1,0 +1,21 @@
+node_modules
+CLAUDE.md
+.playwright-mcp
+.claude
+Server
+"client"
+
+# Dependencies
+node_modules
+/node_modules
+
+# Production
+npm-shrinkwrap.json
+
+# misc
+.DS_Store
+.env
+!.env.example
+\dist
+realm.sqlite
+uploads/

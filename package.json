@@ -1,0 +1,15 @@
+{
+  "name": "concord",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter concord-client-workspace dev",
+    "dev:server": "pnpm --filter @concord/concord-server dev",
+    "dev:client": "pnpm --filter @concord/client dev",
+    "clean": "pnpm -r clean"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

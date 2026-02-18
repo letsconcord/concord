@@ -14,6 +14,12 @@ export interface RealmInfo {
   createdAt: number;
 }
 
+export interface InviteLinkInfo {
+  id: string;
+  key: string;
+  createdAt: number;
+}
+
 export interface RealmWelcome {
   realm: RealmInfo;
   channels: Channel[];
@@ -22,4 +28,5 @@ export interface RealmWelcome {
   isAdmin: boolean;
   voiceParticipants?: Record<string, { publicKey: string; name: string }[]>;
   screenSharers?: Record<string, string[]>;
+  inviteLinks?: InviteLinkInfo[];
 }

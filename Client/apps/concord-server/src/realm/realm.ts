@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import { getDb } from "../db/database.js";
 import config from "../config.js";
 import type { RealmInfo } from "@concord/protocol";
+import { ensureDefaultInvite } from "../invites/invites.js";
 
 /** Ensure the realm row exists (creates on first boot) */
 export function ensureRealm(): RealmInfo {
@@ -27,6 +28,8 @@ export function ensureRealm(): RealmInfo {
     );
     row = db.prepare("SELECT * FROM realm LIMIT 1").get() as Record<string, unknown>;
   }
+
+  ensureDefaultInvite();
 
   return rowToRealmInfo(row);
 }

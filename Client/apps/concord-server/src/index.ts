@@ -10,6 +10,7 @@ import { registerRssRoutes } from "./rss/feed.js";
 import { startRetentionCron } from "./messages/retention.js";
 import { initSfu } from "./media/sfu.js";
 import config, { isPrivateIp } from "./config.js";
+import { getInviteKey } from "./invites/invites.js";
 
 async function main() {
   // Initialize database
@@ -54,6 +55,14 @@ async function main() {
 
   // RSS feed
   registerRssRoutes(app);
+
+  // Invite link key retrieval (public endpoint — returns the GUID for decryption)
+  app.get("/invite/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const key = getInviteKey(id);
+    if (!key) return reply.status(404).send({ error: "Invite not found" });
+    return { key };
+  });
 
   // Health check
   app.get("/health", async () => ({ status: "ok", realm: realm.name }));

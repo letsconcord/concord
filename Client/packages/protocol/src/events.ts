@@ -125,6 +125,10 @@ export interface AuthChallengeEvent {
 
 export interface AuthVerifiedEvent {}
 
+export interface InviteRegeneratedEvent {
+  inviteLinks: { id: string; key: string; createdAt: number }[];
+}
+
 /** Union of all event types for the type field */
 export type EventType =
   | "realm:welcome"
@@ -147,4 +151,5 @@ export type EventType =
   | "voice:participant:left"
   | "voice:transport-created"
   | "voice:new-producer"
-  | "voice:producer-closed";
+  | "voice:producer-closed"
+  | "invite:regenerated";

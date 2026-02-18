@@ -16,6 +16,7 @@ import type {
   DmOpenCommand,
   UserProfileCommand,
   AuthResponseCommand,
+  InviteRegenerateCommand,
   VoiceJoinCommand,
   VoiceLeaveCommand,
   VoiceProduceCommand,
@@ -55,6 +56,7 @@ import {
   getScreenShareChannels,
 } from "../media/rooms.js";
 import { isSfuReady } from "../media/sfu.js";
+import { getInviteLinks, regenerateInvite } from "../invites/invites.js";
 
 export function handleConnection(ws: WebSocket): void {
   const conn = addConnection(ws);
@@ -217,6 +219,9 @@ function handleMessage(ws: WebSocket, envelope: Envelope): void {
     case "dm:open":
       handleDmOpen(ws, envelope.payload as DmOpenCommand);
       break;
+    case "invite:regenerate":
+      handleInviteRegenerate(ws, envelope.payload as InviteRegenerateCommand);
+      break;
     default:
       send(ws, {
         type: "realm:error",
@@ -266,11 +271,13 @@ function handleRealmJoin(ws: WebSocket, _payload: RealmJoinCommand): void {
     }
   }
 
+  const inviteLinks = getInviteLinks();
+
   send(ws, {
     type: "realm:welcome",
     id: uuid(),
     timestamp: Date.now(),
-    payload: { realm, channels, members, onlineKeys, isAdmin: adminFlag, voiceParticipants, screenSharers },
+    payload: { realm, channels, members, onlineKeys, isAdmin: adminFlag, voiceParticipants, screenSharers, inviteLinks },
   });
 }
 
@@ -1057,4 +1064,36 @@ function handleChannelSetPasswordVerify(ws: WebSocket, payload: ChannelSetPasswo
   }
 
   setChannelPasswordVerify(payload.channelId, payload.passwordVerify, payload.passwordVerifyNonce);
+}
+
+function handleInviteRegenerate(ws: WebSocket, payload: InviteRegenerateCommand): void {
+  const conn = getConnection(ws);
+  if (!conn?.publicKey || !isAdmin(conn.publicKey)) {
+    send(ws, {
+      type: "realm:error",
+      id: uuid(),
+      timestamp: Date.now(),
+      payload: { code: "FORBIDDEN", message: "Only admins can regenerate invite links" },
+    });
+    return;
+  }
+
+  const newInvite = regenerateInvite(payload.inviteId);
+  if (!newInvite) {
+    send(ws, {
+      type: "realm:error",
+      id: uuid(),
+      timestamp: Date.now(),
+      payload: { code: "NOT_FOUND", message: "Invite link not found" },
+    });
+    return;
+  }
+
+  const inviteLinks = getInviteLinks();
+  broadcastToAll({
+    type: "invite:regenerated",
+    id: uuid(),
+    timestamp: Date.now(),
+    payload: { inviteLinks },
+  });
 }

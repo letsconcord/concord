@@ -152,6 +152,15 @@ function runMigrations(db: Database.Database): void {
     `);
     db.exec(`UPDATE attachments SET created_at = ${Date.now()} WHERE created_at IS NULL`);
   }
+
+  // Migration: invite_links table for encrypted invite links
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS invite_links (
+      id TEXT PRIMARY KEY,
+      key TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+  `);
 }
 
 export function closeDb(): void {

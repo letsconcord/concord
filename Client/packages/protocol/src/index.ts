@@ -1,6 +1,6 @@
 export type { UserProfile } from "./user.js";
 export type { Channel, ChannelType } from "./channel.js";
-export type { RealmInfo, RealmWelcome } from "./realm.js";
+export type { RealmInfo, RealmWelcome, InviteLinkInfo } from "./realm.js";
 export type {
   Envelope,
   ChatMessage,
@@ -30,6 +30,7 @@ export type {
   ChannelFetchHistoryCommand,
   RealmSetPasswordVerifyCommand,
   ChannelSetPasswordVerifyCommand,
+  InviteRegenerateCommand,
 } from "./commands.js";
 export type {
   EventType,
@@ -55,4 +56,5 @@ export type {
   VoiceTransportCreatedEvent,
   VoiceNewProducerEvent,
   VoiceProducerClosedEvent,
+  InviteRegeneratedEvent,
 } from "./events.js";

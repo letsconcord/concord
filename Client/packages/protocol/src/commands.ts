@@ -118,6 +118,10 @@ export interface ChannelSetPasswordVerifyCommand {
   passwordVerifyNonce: string;
 }
 
+export interface InviteRegenerateCommand {
+  inviteId: string;
+}
+
 /** Union of all command types for the type field */
 export type CommandType =
   | "realm:join"
@@ -141,4 +145,5 @@ export type CommandType =
   | "voice:consume"
   | "voice:create-transport"
   | "voice:connect-transport"
-  | "voice:close-producer";
+  | "voice:close-producer"
+  | "invite:regenerate";

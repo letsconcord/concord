@@ -38,7 +38,7 @@ jobs:
         with:
           switches: -avz --delete
           path: Client/apps/client/dist/
-          remote_path: /opt/concord-server/app-dist/
+          remote_path: /opt/concord/app-dist/
           remote_host: ${{ secrets.DEPLOY_HOST }}
           remote_user: ${{ secrets.DEPLOY_USER }}
           remote_key: ${{ secrets.DEPLOY_SSH_KEY }}

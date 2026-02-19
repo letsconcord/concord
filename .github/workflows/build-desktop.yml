@@ -69,8 +69,8 @@ jobs:
         run: pnpm --filter @concord/protocol build && pnpm --filter @concord/crypto build
 
       - name: Build Tauri app
-        working-directory: Client
-        run: pnpm --filter @concord/client tauri build -- --target ${{ matrix.target }}
+        working-directory: Client/apps/client
+        run: pnpm tauri build --target ${{ matrix.target }}
 
       - name: List bundle output
         shell: bash

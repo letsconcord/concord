@@ -56,5 +56,6 @@ ENV DATA_DIR=/data
 
 VOLUME /data
 EXPOSE 9000
+EXPOSE 10000-10100/udp
 
 CMD ["node", "dist/index.js"]

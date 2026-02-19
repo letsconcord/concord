@@ -35,7 +35,7 @@ jobs:
 
       - name: Build client frontend
         working-directory: Client/apps/client
-        run: npx vite build
+        run: pnpm exec vite build
 
       - name: Deploy to Hetzner
         uses: burnett01/rsync-deployments@7.0.1

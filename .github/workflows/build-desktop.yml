@@ -67,6 +67,10 @@ jobs:
         working-directory: Client
         run: pnpm --filter @concord/client tauri build -- --target ${{ matrix.target }}
 
+      - name: List bundle output
+        shell: bash
+        run: find Client/apps/client/src-tauri/target -type d -name bundle 2>/dev/null | head -5 && find Client/apps/client/src-tauri/target -path "*/bundle/*" -type f 2>/dev/null || echo "No bundle directory found"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -75,6 +79,13 @@ jobs:
             Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
             Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
             Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
             Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
             Client/apps/client/src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
-          if-no-files-found: ignore
+            Client/apps/client/src-tauri/target/release/bundle/nsis/*.exe
+            Client/apps/client/src-tauri/target/release/bundle/msi/*.msi
+            Client/apps/client/src-tauri/target/release/bundle/dmg/*.dmg
+            Client/apps/client/src-tauri/target/release/bundle/macos/*.app
+            Client/apps/client/src-tauri/target/release/bundle/appimage/*.AppImage
+            Client/apps/client/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: warn

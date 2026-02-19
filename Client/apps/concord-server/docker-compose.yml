@@ -16,10 +16,12 @@ services:
   realm-server:
     build:
       context: ../../
-      dockerfile: apps/realm-server/Dockerfile
+      dockerfile: apps/concord-server/Dockerfile
     restart: unless-stopped
     expose:
       - "9000"
+    ports:
+      - "10000-10100:10000-10100/udp"
     volumes:
       - realm_data:/data
     env_file:

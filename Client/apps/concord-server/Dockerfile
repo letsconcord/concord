@@ -2,6 +2,10 @@
 # Build context: Client/ (workspace root)
 FROM node:22-slim AS builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 pip make g++ && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable pnpm
 
 WORKDIR /app
@@ -15,7 +19,7 @@ COPY packages/crypto/package.json packages/crypto/
 COPY apps/concord-server/package.json apps/concord-server/
 
 # Install all dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source code
 COPY packages/protocol/ packages/protocol/
@@ -32,10 +36,6 @@ RUN pnpm --filter @concord/concord-server --prod deploy /app/pruned
 
 # ── Stage 2: Runtime ──
 FROM node:22-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ && \
-    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

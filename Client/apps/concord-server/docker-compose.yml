@@ -21,6 +21,7 @@ services:
     expose:
       - "9000"
     ports:
+      - "9000:9000"
       - "10000-10100:10000-10100/udp"
     volumes:
       - realm_data:/data

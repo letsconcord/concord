@@ -140,5 +140,11 @@ Your seed phrase is your account. Your device is your encryption engine. Your se
 
 ---
 
+### Support Concord
+
+If Concord is useful to you, consider [buying the dev a coffee](https://buymeacoffee.com/darrylondil).
+
+---
+
 &copy; 2026 Concord. Open-source under MIT License.
 

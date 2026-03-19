@@ -13,6 +13,7 @@ import { useRealmStore } from "../../stores/realm";
 import { useIdentityStore } from "../../stores/identity";
 import { Avatar } from "../ui/avatar";
 import { getFileUrl, downloadDecryptedBlob, downloadDecryptedFile } from "../../features/files/upload";
+import { useLightboxStore } from "../ui/image-lightbox";
 import { getKeys } from "../../features/bridge/iframe-bridge";
 import { requestOpenExternal } from "../../features/bridge/iframe-bridge";
 import { FileIcon, Download, Loader2 } from "lucide-react";
@@ -190,7 +191,7 @@ export function Message({ message, showHeader }: MessageProps) {
       {gifs.length > 0 && (
         <div className="mt-1 mb-1">
           {gifs.map((url, i) => (
-            <img key={i} src={url} alt="GIF" className="max-w-sm max-h-64 rounded-xl" loading="lazy" />
+            <img key={i} src={url} alt="GIF" className="max-w-full md:max-w-sm max-h-64 rounded-xl" loading="lazy" />
           ))}
         </div>
       )}
@@ -276,7 +277,7 @@ function DecryptedImage({ fileId, filename, encryptionKey, onClick, className }:
   if (!src) {
     return <div className={cn("flex items-center justify-center bg-secondary rounded-xl text-xs text-muted-foreground", className)} style={{ minWidth: 120, minHeight: 80 }}>Failed to decrypt</div>;
   }
-  return <button className="block cursor-pointer hover:opacity-95 transition-opacity" onClick={onClick}><img src={src} alt={filename} className={className} loading="lazy" /></button>;
+  return <button className="block max-w-full cursor-pointer hover:opacity-95 transition-opacity" onClick={onClick}><img src={src} alt={filename} className={className} loading="lazy" /></button>;
 }
 
 // ── Decrypted file link ──
@@ -308,20 +309,46 @@ function DecryptedFileLink({ fileId, filename, encryptionKey }: { fileId: string
 // ── Image gallery ──
 
 function ImageGallery({ images, encryptionKey }: { images: FileRef[]; encryptionKey: Uint8Array | null; }) {
+  const openLightbox = useLightboxStore((s) => s.open);
+
+  function handleClick(index: number) {
+    if (encryptionKey) {
+      Promise.all(
+        images.map((img) =>
+          downloadDecryptedBlob(img.fileId, guessMimeType(img.filename), encryptionKey)
+        )
+      ).then((urls) => {
+        openLightbox(
+          urls.map((url, i) => ({ src: url, alt: images[i].filename })),
+          index
+        );
+      });
+      return;
+    }
+
+    openLightbox(
+      images.map((img) => ({
+        src: getFileUrl(img.fileId),
+        alt: img.filename,
+      })),
+      index
+    );
+  }
+
   if (images.length === 1) {
     const img = images[0];
     return (
       <div className="mt-1 mb-1 rounded-xl overflow-hidden">
-        <DecryptedImage fileId={img.fileId} filename={img.filename} encryptionKey={encryptionKey} className="max-w-full md:max-w-md max-h-80 object-contain rounded-xl" />
+        <DecryptedImage fileId={img.fileId} filename={img.filename} encryptionKey={encryptionKey} onClick={() => handleClick(0)} className="max-w-full md:max-w-md max-h-80 object-contain rounded-xl" />
       </div>
     );
   }
 
   return (
     <div className="flex flex-wrap gap-1 mt-1 mb-1">
-      {images.map((img) => (
+      {images.map((img, i) => (
         <div key={img.fileId} className="rounded-lg overflow-hidden">
-          <DecryptedImage fileId={img.fileId} filename={img.filename} encryptionKey={encryptionKey} className="max-w-[200px] max-h-48 object-contain rounded-lg" />
+          <DecryptedImage fileId={img.fileId} filename={img.filename} encryptionKey={encryptionKey} onClick={() => handleClick(i)} className="max-w-[200px] max-h-48 object-contain rounded-lg" />
         </div>
       ))}
     </div>

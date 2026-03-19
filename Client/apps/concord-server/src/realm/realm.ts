@@ -68,6 +68,7 @@ export function updateRealm(update: {
   allowDirectMessages?: boolean;
   retentionDays?: number | null;
   fileRetentionDays?: number | null;
+  thumbnailFileId?: string | null;
 }): RealmInfo {
   const db = getDb();
   if (update.name !== undefined) {
@@ -84,6 +85,9 @@ export function updateRealm(update: {
   }
   if (update.fileRetentionDays !== undefined) {
     db.prepare("UPDATE realm SET file_retention_days = ?").run(update.fileRetentionDays);
+  }
+  if (update.thumbnailFileId !== undefined) {
+    db.prepare("UPDATE realm SET thumbnail_file_id = ?").run(update.thumbnailFileId);
   }
   return ensureRealm();
 }
@@ -106,6 +110,7 @@ function rowToRealmInfo(row: Record<string, unknown>): RealmInfo {
     allowDirectMessages: (row.allow_dm as number) === 1,
     passwordVerify: (row.password_verify as string) ?? undefined,
     passwordVerifyNonce: (row.password_verify_nonce as string) ?? undefined,
+    thumbnailFileId: (row.thumbnail_file_id as string) ?? undefined,
     createdAt: row.created_at as number,
   };
 }

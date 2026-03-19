@@ -232,6 +232,11 @@ export function requestChannelPassword(
   });
 }
 
+/** Tell parent to show or hide the realm sidebar (mobile). */
+export function reportSidebarState(open: boolean): void {
+  postToParent({ type: "bridge:sidebar:state", open });
+}
+
 // ─── Accessors ──────────────────────────────────────────────────
 
 export function getIdentity(): RealmIdentity | null {

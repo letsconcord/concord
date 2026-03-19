@@ -92,6 +92,7 @@ export interface RealmUpdateCommand {
   allowDirectMessages?: boolean;
   retentionDays?: number | null;
   fileRetentionDays?: number | null;
+  thumbnailFileId?: string | null;
 }
 
 export interface DmOpenCommand {

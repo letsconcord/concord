@@ -153,6 +153,12 @@ function runMigrations(db: Database.Database): void {
     db.exec(`UPDATE attachments SET created_at = ${Date.now()} WHERE created_at IS NULL`);
   }
 
+  // Migration: add thumbnail_file_id to realm table
+  const realmInfo3 = db.pragma("table_info(realm)") as { name: string }[];
+  if (!realmInfo3.find((c) => c.name === "thumbnail_file_id")) {
+    db.exec("ALTER TABLE realm ADD COLUMN thumbnail_file_id TEXT");
+  }
+
   // Migration: invite_links table for encrypted invite links
   db.exec(`
     CREATE TABLE IF NOT EXISTS invite_links (

@@ -24,3 +24,4 @@ Client/apps/concord-server/data/realm.sqlite-wal
 Client/apps/concord-server/data/realm.sqlite-wal
 Client/apps/concord-server/data/realm.sqlite-wal
 realm.sqlite-shm
+dist-ui

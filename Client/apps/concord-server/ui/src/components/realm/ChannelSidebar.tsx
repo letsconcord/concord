@@ -1,11 +1,7 @@
 /**
  * ChannelSidebar for server UI — single-realm mode.
  *
- * Adaptations from client version:
- * - Uses useRealmStore (single realm) instead of useRealmsStore (multi)
- * - No realm settings dialog, role editor (those stay in shell)
- * - Simplified voice channel click (Phase 3+)
- * - No invite link generation (that's a shell concern)
+ * Includes admin features: create channels, realm settings, role editor.
  */
 
 import { useState } from "react";
@@ -16,19 +12,28 @@ import { useRolesStore } from "../../stores/roles";
 import { useMembersStore } from "../../stores/members";
 import { useNotificationsStore } from "../../stores/notifications";
 import { getWebSocketClient } from "../../features/connection/realm-handler";
+import { joinVoiceChannel, leaveVoiceChannel } from "../../features/media/voice";
 import { requestChannelPassword, getKeys } from "../../features/bridge/iframe-bridge";
+import { VoicePanel } from "../voice/VoiceChannel";
+import { VoiceChannelParticipants } from "../voice/VoiceChannelParticipants";
+import { CreateChannelDialog } from "./CreateChannelDialog";
+import { RealmSettingsDialog } from "./RealmSettingsDialog";
+import { RoleEditor } from "./RoleEditor";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar } from "../ui/avatar";
+import { useContextMenu } from "../ui/context-menu";
 import { cn } from "@/lib/utils";
 import { hasPermission, Permission } from "@concord/protocol";
 import {
   Hash,
   Volume2,
-  ChevronDown,
   Plus,
   Trash2,
   Lock,
-  MessageSquare,
+  Settings,
+  Shield,
+  ChevronDown,
+  EyeOff,
 } from "lucide-react";
 
 interface ChannelSidebarProps {
@@ -51,10 +56,22 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
   const onlineKeys = useMembersStore((s) => s.onlineKeys);
 
   const canManageChannels = isAdmin || hasPermission(myPerms, Permission.MANAGE_CHANNELS);
+  const canManageRoles = isAdmin || hasPermission(myPerms, Permission.MANAGE_ROLES);
+
+  // Dialog state
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [createChannelType, setCreateChannelType] = useState<"text" | "voice">("text");
+  const [showRealmSettings, setShowRealmSettings] = useState(false);
+  const [showRoleEditor, setShowRoleEditor] = useState(false);
+  const [showRealmMenu, setShowRealmMenu] = useState(false);
+  const dmCtx = useContextMenu();
+
+  const hiddenDmIds = useNotificationsStore((s) => s.hiddenDmIds);
+  const hideDm = useNotificationsStore((s) => s.hideDm);
 
   const textChannels = channels.filter((c) => c.type === "text");
   const voiceChannels = channels.filter((c) => c.type === "voice");
-  const dmChannels = channels.filter((c) => c.type === "dm");
+  const dmChannels = channels.filter((c) => c.type === "dm" && !hiddenDmIds.has(c.id));
 
   function joinChannel(channelId: string) {
     setActiveChannel(channelId);
@@ -76,8 +93,18 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
   }
 
   function handleVoiceChannelClick(channelId: string) {
-    // Voice joining will be fully wired in Phase 3
-    setActiveChannel(channelId);
+    const client = getWebSocketClient();
+    if (!client) return;
+
+    if (voiceChannelId === channelId) {
+      setActiveChannel(channelId);
+    } else {
+      if (voiceChannelId) {
+        leaveVoiceChannel(voiceChannelId, client);
+      }
+      joinVoiceChannel(channelId, client);
+      setActiveChannel(channelId);
+    }
     onNavigate?.();
   }
 
@@ -86,13 +113,51 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
     client?.send("channel:delete", { channelId });
   }
 
+  function openCreateChannel(type: "text" | "voice") {
+    setCreateChannelType(type);
+    setShowCreateChannel(true);
+  }
+
+  const hasAdminMenu = isAdmin || canManageRoles;
+
   return (
-    <div className="flex flex-col w-60 bg-sidebar-background shrink-0 border-r border-sidebar-border pb-14">
+    <div className="flex flex-col w-60 h-full bg-sidebar-background shrink-0 border-r border-sidebar-border pb-14">
       {/* Realm header */}
-      <div className="h-12 px-4 flex items-center border-b border-sidebar-border shrink-0">
+      <div className="h-12 px-4 flex items-center border-b border-sidebar-border shrink-0 relative">
         <span className="font-semibold text-foreground truncate flex-1">
           {realmInfo.name}
         </span>
+        {hasAdminMenu && (
+          <button
+            onClick={() => setShowRealmMenu((v) => !v)}
+            className="p-1 rounded hover:bg-sidebar-accent cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        )}
+        {/* Realm admin dropdown menu */}
+        {showRealmMenu && (
+          <div className="absolute right-2 top-11 w-48 rounded-md bg-popover border border-border shadow-lg py-1 z-50">
+            {isAdmin && (
+              <button
+                onClick={() => { setShowRealmMenu(false); setShowRealmSettings(true); }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-foreground hover:bg-accent cursor-pointer transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Realm Settings
+              </button>
+            )}
+            {canManageRoles && (
+              <button
+                onClick={() => { setShowRealmMenu(false); setShowRoleEditor(true); }}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-foreground hover:bg-accent cursor-pointer transition-colors"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Roles
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Channel list */}
@@ -104,7 +169,10 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
               Text Channels
             </span>
             {canManageChannels && (
-              <button className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => openCreateChannel("text")}
+                className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer text-muted-foreground hover:text-foreground"
+              >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             )}
@@ -156,10 +224,17 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
             <span className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wide flex-1">
               Voice Channels
             </span>
+            {canManageChannels && (
+              <button
+                onClick={() => openCreateChannel("voice")}
+                className="p-0.5 rounded hover:bg-sidebar-accent cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {voiceChannels.map((channel) => {
-            const participants = useVoiceStore.getState().voiceChannelParticipants.get(channel.id);
             return (
               <div key={channel.id}>
                 <div className="group flex items-center">
@@ -181,17 +256,7 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
                     )}
                   </button>
                 </div>
-                {/* Show voice participants under each voice channel */}
-                {participants && participants.size > 0 && (
-                  <div className="pl-7 pr-2 pb-1">
-                    {Array.from(participants.values()).map((p) => (
-                      <div key={p.publicKey} className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        <span className="truncate">{p.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <VoiceChannelParticipants channelId={channel.id} />
               </div>
             );
           })}
@@ -217,6 +282,13 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
                 <button
                   key={channel.id}
                   onClick={() => { joinChannel(channel.id); onNavigate?.(); }}
+                  onContextMenu={(e) => dmCtx.show(e, [
+                    {
+                      label: "Hide Conversation",
+                      icon: <EyeOff className="w-4 h-4" />,
+                      onClick: () => hideDm(channel.id),
+                    },
+                  ])}
                   className={cn(
                     "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-colors",
                     activeChannelId === channel.id
@@ -245,6 +317,26 @@ export function ChannelSidebar({ onNavigate }: ChannelSidebarProps) {
           </div>
         )}
       </ScrollArea>
+
+      {dmCtx.element}
+
+      {/* Voice connected panel — docked at bottom */}
+      <VoicePanel />
+
+      {/* Admin dialogs */}
+      <CreateChannelDialog
+        open={showCreateChannel}
+        onOpenChange={setShowCreateChannel}
+        defaultType={createChannelType}
+      />
+      <RealmSettingsDialog
+        open={showRealmSettings}
+        onOpenChange={setShowRealmSettings}
+      />
+      <RoleEditor
+        open={showRoleEditor}
+        onOpenChange={setShowRoleEditor}
+      />
     </div>
   );
 }

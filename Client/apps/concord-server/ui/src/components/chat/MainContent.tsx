@@ -3,8 +3,13 @@ import { useRealmStore } from "../../stores/realm";
 import { useIdentityStore } from "../../stores/identity";
 import { useMembersStore } from "../../stores/members";
 import { useNotificationsStore } from "../../stores/notifications";
+import { useVoiceStore } from "../../stores/voice";
 import { ChannelHeader } from "./ChannelHeader";
 import { MessageList } from "./MessageList";
+import { VideoGrid } from "../voice/VideoGrid";
+import { VoiceControls } from "../voice/VoiceControls";
+import { AudioConsumers } from "../voice/AudioConsumers";
+import { SpeakingDetector } from "../voice/SpeakingDetector";
 import { Headphones } from "lucide-react";
 
 interface MainContentProps {
@@ -19,6 +24,8 @@ export function MainContent({ onToggleSidebar, onToggleMembers }: MainContentPro
   const publicKey = useIdentityStore((s) => s.publicKey);
   const members = useMembersStore((s) => s.members);
   const markRead = useNotificationsStore((s) => s.markRead);
+
+  const voiceChannelId = useVoiceStore((s) => s.activeChannelId);
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
@@ -44,6 +51,7 @@ export function MainContent({ onToggleSidebar, onToggleMembers }: MainContentPro
   }
 
   const isVoiceChannel = activeChannel.type === "voice";
+  const isInVoiceCall = isVoiceChannel && voiceChannelId === activeChannel.id;
 
   return (
     <div className="flex-1 flex flex-col bg-background min-w-0">
@@ -55,14 +63,21 @@ export function MainContent({ onToggleSidebar, onToggleMembers }: MainContentPro
       />
 
       {isVoiceChannel ? (
-        <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-background via-background to-secondary/30">
-          <div className="text-center space-y-3">
-            <Headphones className="w-12 h-12 text-muted-foreground/40 mx-auto" />
-            <p className="text-muted-foreground text-sm">
-              Click to join the voice channel
-            </p>
+        isInVoiceCall ? (
+          <>
+            <VideoGrid />
+            <VoiceControls />
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-background via-background to-secondary/30">
+            <div className="text-center space-y-3">
+              <Headphones className="w-12 h-12 text-muted-foreground/40 mx-auto" />
+              <p className="text-muted-foreground text-sm">
+                Click to join the voice channel
+              </p>
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <MessageList
           channelId={activeChannel.id}
@@ -70,6 +85,14 @@ export function MainContent({ onToggleSidebar, onToggleMembers }: MainContentPro
           channelEncrypted={activeChannel.encrypted}
           isDm={activeChannel.type === "dm"}
         />
+      )}
+
+      {/* Audio + speaking detection — always mounted when in any voice call */}
+      {voiceChannelId && (
+        <>
+          <AudioConsumers />
+          <SpeakingDetector />
+        </>
       )}
     </div>
   );

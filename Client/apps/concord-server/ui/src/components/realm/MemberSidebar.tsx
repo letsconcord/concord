@@ -1,25 +1,24 @@
 /**
  * MemberSidebar for server UI — single-realm mode.
  *
- * Adaptations: uses single-realm members/roles stores,
- * no UserProfilePopover (simplified for now).
+ * Shows role-grouped online members with profile popovers on hover
+ * and context menu on right-click (kick, ban, DM).
  */
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useMembersStore } from "../../stores/members";
 import { useRolesStore } from "../../stores/roles";
+import { useRealmStore } from "../../stores/realm";
+import { useIdentityStore } from "../../stores/identity";
+import { getWebSocketClient } from "../../features/connection/realm-handler";
+import { useContextMenu, type ContextMenuEntry } from "../ui/context-menu";
 import { ScrollArea } from "../ui/scroll-area";
 import { Avatar } from "../ui/avatar";
+import { UserProfilePopover } from "../profile/UserProfilePopover";
+import { roleColor } from "../../lib/role-color";
+import { hasPermission, Permission } from "@concord/protocol";
+import { UserX, Ban, MessageSquare } from "lucide-react";
 import type { UserProfile, Role } from "@concord/protocol";
-
-function roleColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 60%)`;
-}
 
 interface MemberSidebarProps {
   mobile?: boolean;
@@ -62,6 +61,7 @@ export function MemberSidebar({ mobile }: MemberSidebarProps) {
   }, [membersArray, onlineKeys, roles]);
 
   const totalOnline = roleGroups.reduce((n, g) => n + g.members.length, 0) + onlineNoRole.length;
+  const ctx = useContextMenu();
 
   return (
     <div className={`w-60 bg-sidebar-background shrink-0 border-l border-sidebar-border flex-col ${mobile ? "flex" : "hidden lg:flex"}`}>
@@ -75,7 +75,7 @@ export function MemberSidebar({ mobile }: MemberSidebarProps) {
               </span>
             </div>
             {roleMembers.map((member) => (
-              <MemberRow key={member.publicKey} member={member} isOnline color={roleColor(role.name)} />
+              <MemberRow key={member.publicKey} member={member} isOnline color={roleColor(role.name)} ctx={ctx} />
             ))}
           </div>
         ))}
@@ -89,7 +89,7 @@ export function MemberSidebar({ mobile }: MemberSidebarProps) {
               </span>
             </div>
             {onlineNoRole.map((member) => (
-              <MemberRow key={member.publicKey} member={member} isOnline />
+              <MemberRow key={member.publicKey} member={member} isOnline ctx={ctx} />
             ))}
           </div>
         )}
@@ -108,7 +108,7 @@ export function MemberSidebar({ mobile }: MemberSidebarProps) {
               </span>
             </div>
             {offline.map((member) => (
-              <MemberRow key={member.publicKey} member={member} isOnline={false} />
+              <MemberRow key={member.publicKey} member={member} isOnline={false} ctx={ctx} />
             ))}
           </>
         )}
@@ -117,17 +117,76 @@ export function MemberSidebar({ mobile }: MemberSidebarProps) {
           <p className="text-sm text-muted-foreground px-2 py-4">No members yet</p>
         )}
       </ScrollArea>
+      {ctx.element}
     </div>
   );
 }
 
-function MemberRow({ member, isOnline, color }: { member: UserProfile; isOnline: boolean; color?: string; }) {
+function MemberRow({ member, isOnline, color, ctx }: {
+  member: UserProfile;
+  isOnline: boolean;
+  color?: string;
+  ctx: ReturnType<typeof useContextMenu>;
+}) {
+  const myKey = useIdentityStore((s) => s.publicKey);
+  const isAdmin = useRealmStore((s) => s.isAdmin);
+  const myPerms = useRolesStore((s) => s.myPermissions);
+  const allowDm = useRealmStore((s) => s.info.allowDirectMessages);
+  const isOwnProfile = myKey === member.publicKey;
+  const canKick = !isOwnProfile && (isAdmin || hasPermission(myPerms, Permission.KICK));
+  const canBan = !isOwnProfile && (isAdmin || hasPermission(myPerms, Permission.BAN));
+  const canDm = !isOwnProfile && !!allowDm;
+
+  function handleContextMenu(e: React.MouseEvent) {
+    const items: ContextMenuEntry[] = [];
+    if (canDm) {
+      items.push({
+        label: "Message",
+        icon: <MessageSquare className="w-4 h-4" />,
+        onClick: () => {
+          const client = getWebSocketClient();
+          client?.send("dm:open", { targetPublicKey: member.publicKey });
+        },
+      });
+    }
+    if (canKick || canBan) {
+      if (items.length > 0) items.push({ separator: true });
+      if (canKick) {
+        items.push({
+          label: "Kick",
+          icon: <UserX className="w-4 h-4" />,
+          onClick: () => {
+            const client = getWebSocketClient();
+            client?.send("member:kick", { publicKey: member.publicKey });
+          },
+        });
+      }
+      if (canBan) {
+        items.push({
+          label: "Ban",
+          icon: <Ban className="w-4 h-4" />,
+          variant: "destructive",
+          onClick: () => {
+            const client = getWebSocketClient();
+            client?.send("member:ban", { publicKey: member.publicKey });
+          },
+        });
+      }
+    }
+    if (items.length > 0) ctx.show(e, items);
+  }
+
   return (
-    <button className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 cursor-pointer transition-colors ${isOnline ? "" : "opacity-50"}`}>
-      <Avatar name={member.name} size="sm" status={isOnline ? "online" : "offline"} />
-      <span className="text-sm truncate" style={color ? { color } : undefined}>
-        {member.name}
-      </span>
-    </button>
+    <UserProfilePopover publicKey={member.publicKey} name={member.name} trigger={
+      <button
+        onContextMenu={handleContextMenu}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 cursor-pointer transition-colors ${isOnline ? "" : "opacity-50"}`}
+      >
+        <Avatar name={member.name} size="sm" status={isOnline ? "online" : "offline"} />
+        <span className="text-sm truncate" style={color ? { color } : undefined}>
+          {member.name}
+        </span>
+      </button>
+    } />
   );
 }

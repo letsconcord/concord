@@ -11,6 +11,7 @@ export interface RealmInfo {
   allowDirectMessages?: boolean;
   passwordVerify?: string;
   passwordVerifyNonce?: string;
+  thumbnailFileId?: string;
   createdAt: number;
 }
 

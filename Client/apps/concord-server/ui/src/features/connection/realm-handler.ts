@@ -17,6 +17,15 @@ import {
   reportUnread,
 } from "../bridge/iframe-bridge.js";
 import { decryptMessage, verifyMessage } from "../crypto/bridge.js";
+import {
+  initDevice,
+  confirmVoiceJoined,
+  createTransports,
+  produceAudio,
+  consumeProducer,
+  closeConsumerForProducer,
+  isRecvTransportReady,
+} from "../media/voice.js";
 import type {
   Envelope,
   AuthChallengeEvent,
@@ -303,6 +312,7 @@ export function connect(): void {
         allowDirectMessages: payload.allowDirectMessages,
         retentionDays: payload.retentionDays ?? undefined,
         fileRetentionDays: payload.fileRetentionDays ?? undefined,
+        thumbnailFileId: payload.thumbnailFileId ?? undefined,
       });
     }
   });
@@ -338,12 +348,63 @@ export function connect(): void {
   // ── Voice events ──
 
   client.on("voice:joined", async (envelope: Envelope) => {
-    const _payload = envelope.payload as VoiceJoinedEvent;
-    // Will be wired when voice components are moved (Phase 3)
+    const payload = envelope.payload as VoiceJoinedEvent;
+    try {
+      confirmVoiceJoined(payload.channelId);
+
+      const id = getIdentity();
+      if (id) {
+        const voiceStore = useVoiceStore.getState();
+        voiceStore.addParticipant({
+          publicKey: id.publicKey,
+          name: id.name,
+          isMuted: false,
+          isSpeaking: false,
+          hasWebcam: false,
+          hasScreen: false,
+        });
+        voiceStore.addChannelParticipant(payload.channelId, {
+          publicKey: id.publicKey,
+          name: id.name,
+        });
+      }
+
+      await initDevice(payload.rtpCapabilities);
+      await createTransports(payload.channelId, client!, payload.iceServers as RTCIceServer[] | undefined);
+      await produceAudio(payload.channelId, client!);
+
+      // Consume any buffered remote producers
+      const voiceState = useVoiceStore.getState();
+      const selfKey = getIdentity()?.publicKey;
+      const consumedProducerIds = new Set(
+        Array.from(voiceState.remoteStreams.values()).map((s) => s.producerId)
+      );
+      for (const producer of voiceState.remoteProducers.values()) {
+        if (producer.producerPublicKey === selfKey) continue;
+        if (consumedProducerIds.has(producer.producerId)) continue;
+        if (producer.producerKind === "mic" || producer.producerKind === "webcam") {
+          try {
+            await consumeProducer(payload.channelId, producer.producerId, client!);
+          } catch (err) {
+            console.error("[voice] Failed to consume buffered producer:", err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[voice] Failed to init voice pipeline:", err);
+    }
   });
 
   client.on("voice:participant:joined", (envelope: Envelope) => {
     const payload = envelope.payload as VoiceParticipantJoinedEvent;
+    useVoiceStore.getState().addParticipant({
+      publicKey: payload.publicKey,
+      name: payload.name,
+      isMuted: false,
+      isSpeaking: false,
+      hasWebcam: false,
+      hasScreen: false,
+    });
     useVoiceStore.getState().addChannelParticipant(payload.channelId, {
       publicKey: payload.publicKey,
       name: payload.name,
@@ -352,15 +413,69 @@ export function connect(): void {
 
   client.on("voice:participant:left", (envelope: Envelope) => {
     const payload = envelope.payload as VoiceParticipantLeftEvent;
+    useVoiceStore.getState().removeParticipant(payload.publicKey);
     useVoiceStore.getState().removeChannelParticipant(payload.channelId, payload.publicKey);
   });
 
-  client.on("voice:new-producer", (_envelope: Envelope) => {
-    // Phase 3
+  client.on("voice:new-producer", async (envelope: Envelope) => {
+    const payload = envelope.payload as VoiceNewProducerEvent;
+    const selfKey = getIdentity()?.publicKey;
+
+    if (payload.producerKind === "screen") {
+      useVoiceStore.getState().addScreenSharer(payload.channelId, payload.producerPublicKey);
+    }
+
+    if (payload.producerPublicKey === selfKey) return;
+
+    const voiceStore = useVoiceStore.getState();
+    voiceStore.addRemoteProducer({
+      producerId: payload.producerId,
+      producerPublicKey: payload.producerPublicKey,
+      kind: payload.kind,
+      producerKind: payload.producerKind,
+    });
+
+    if (payload.producerKind === "webcam") {
+      voiceStore.updateParticipantMedia(payload.producerPublicKey, { hasWebcam: true });
+    } else if (payload.producerKind === "screen") {
+      voiceStore.updateParticipantMedia(payload.producerPublicKey, { hasScreen: true });
+    }
+
+    if (voiceStore.activeChannelId === payload.channelId && isRecvTransportReady()) {
+      if (payload.producerKind === "mic" || payload.producerKind === "webcam") {
+        try {
+          await consumeProducer(payload.channelId, payload.producerId, client!);
+        } catch (err) {
+          console.error("[voice] Failed to auto-consume producer:", err);
+        }
+      }
+    }
   });
 
-  client.on("voice:producer-closed", (_envelope: Envelope) => {
-    // Phase 3
+  client.on("voice:producer-closed", (envelope: Envelope) => {
+    const payload = envelope.payload as VoiceProducerClosedEvent;
+
+    if (payload.producerKind === "screen") {
+      useVoiceStore.getState().removeScreenSharer(payload.channelId, payload.producerPublicKey);
+    }
+
+    const selfKey = getIdentity()?.publicKey;
+    if (payload.producerPublicKey === selfKey) return;
+
+    const voiceStore = useVoiceStore.getState();
+    voiceStore.removeRemoteProducer(payload.producerId);
+
+    if (payload.producerKind === "webcam") {
+      voiceStore.updateParticipantMedia(payload.producerPublicKey, { hasWebcam: false });
+    } else if (payload.producerKind === "screen") {
+      voiceStore.updateParticipantMedia(payload.producerPublicKey, { hasScreen: false });
+    }
+
+    closeConsumerForProducer(payload.producerId);
+
+    if (voiceStore.watchingScreenId === payload.producerId) {
+      voiceStore.setWatchingScreen(null);
+    }
   });
 
   // ── Moderation ──

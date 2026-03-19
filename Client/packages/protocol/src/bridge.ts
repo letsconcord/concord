@@ -115,6 +115,12 @@ export interface BridgeChannelPasswordRequestMessage {
   channelName: string;
 }
 
+/** Iframe requests parent to show/hide the realm sidebar (mobile). */
+export interface BridgeSidebarStateMessage {
+  type: "bridge:sidebar:state";
+  open: boolean;
+}
+
 export type IframeToParentMessage =
   | BridgeReadyMessage
   | BridgeSignRequestMessage
@@ -123,7 +129,8 @@ export type IframeToParentMessage =
   | BridgeNotificationUnreadMessage
   | BridgeVoiceStatusMessage
   | BridgeOpenExternalMessage
-  | BridgeChannelPasswordRequestMessage;
+  | BridgeChannelPasswordRequestMessage
+  | BridgeSidebarStateMessage;
 
 // ─── Union ──────────────────────────────────────────────────────
 

@@ -1002,6 +1002,7 @@ function handleRealmUpdate(ws: WebSocket, payload: RealmUpdateCommand): void {
     allowDirectMessages: payload.allowDirectMessages,
     retentionDays: payload.retentionDays,
     fileRetentionDays: payload.fileRetentionDays,
+    thumbnailFileId: payload.thumbnailFileId,
   });
 
   broadcastToAll({
@@ -1014,6 +1015,7 @@ function handleRealmUpdate(ws: WebSocket, payload: RealmUpdateCommand): void {
       allowDirectMessages: updated.allowDirectMessages,
       retentionDays: updated.retentionDays ?? null,
       fileRetentionDays: updated.fileRetentionDays ?? null,
+      thumbnailFileId: updated.thumbnailFileId ?? null,
     },
   });
 }

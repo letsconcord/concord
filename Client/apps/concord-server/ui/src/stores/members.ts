@@ -32,9 +32,17 @@ export const useMembersStore = create<MembersState>((set, get) => ({
   setOnlineKeys: (keys) => set({ onlineKeys: new Set(keys) }),
 
   addMember: (member) =>
-    set((state) => ({
-      members: { ...state.members, [member.publicKey]: member },
-    })),
+    set((state) => {
+      const existing = state.members[member.publicKey];
+      return {
+        members: {
+          ...state.members,
+          [member.publicKey]: existing
+            ? { ...existing, ...member, roleId: member.roleId ?? existing.roleId }
+            : member,
+        },
+      };
+    }),
 
   removeMember: (publicKey) =>
     set((state) => {
